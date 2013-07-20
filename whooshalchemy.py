@@ -125,12 +125,15 @@ class IndexService(object):
           # added as a new doc. Could probably replace this with a whoosh
           # update.
 
-          writer.delete_by_term(primary_field, unicode(getattr(model, primary_field)))
-
-          if change_type in ("new", "changed"):
+          if change_type == "deleted":
+              writer.delete_by_term(primary_field, unicode(getattr(model, primary_field)))
+          else:
             attrs = dict((key, getattr(model, key)) for key in searchable)
             attrs[primary_field] = unicode(getattr(model, primary_field))
-            writer.add_document(**attrs)
+            if change_type == "new":
+                writer.add_document(**attrs)
+            elif change_type == "changed":
+                writer.update_document(**attrs)
 
     self.to_update = {}
 
