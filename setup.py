@@ -23,7 +23,7 @@ setup(
     include_package_data=True,
     platforms='any',
     install_requires=[
-        'whoosh', 'sqlalchemy'
+        'whoosh', 'sqlalchemy', 'jieba'
     ],
     classifiers=[
         'Intended Audience :: Developers',

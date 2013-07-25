@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+#encoding:utf-8
 from __future__ import absolute_import
 
 import whooshalchemy
@@ -17,7 +19,7 @@ class Tests(TestCase):
 
   def setUp(self):
 
-    engine = create_engine('sqlite:///:memory:', echo=True)
+    engine = create_engine('sqlite:///:memory:')
     Session = sessionmaker(bind=engine)
     self.session = Session()
 
@@ -37,9 +39,8 @@ class Tests(TestCase):
 
     self.Post = Post
     Base.metadata.create_all(engine)
-
     self.index_manager = whooshalchemy.IndexService(session=self.session)
-    self.index_manager.register_class(Post)
+    self.index_manager.register_class(self.Post)
 
   def tearDown(self):
       try:
@@ -48,6 +49,19 @@ class Tests(TestCase):
           if e.errno != 2:  # code 2 - no such file or directory
               raise
 
+  def test_rebuild_index(self):
+      for i in xrange(15):
+          item = self.Post(title=u'good natured people are fun')
+          self.session.add(item)
+      for i in xrange(22):
+          item = self.Post(title=u"中文标题", body=u'试试中文呢？会发生神马')
+          self.session.add(item)
+      self.session.commit()
+      
+      self.index_manager.rebuild_index_model(self.Post, self.session)
+      self.assertEqual(self.Post.search_query(u'中文神马的', pagenum=1, pagelen=20).count(), 20)
+      self.assertEqual(self.Post.search_query(u'中文神马的', pagenum=2, pagelen=20).count(), 2)
+      self.assertEqual(self.Post.search_query(u'good').count(), 15)
 
   def test_title(self):
       def add(title):

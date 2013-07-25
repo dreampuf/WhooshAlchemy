@@ -72,6 +72,22 @@ Note: the response is a ``BaseQuery`` object, so you can append other SQL operat
 >>> list(BlogPost.search_query(u'first').filter(BlogPost.id >= 0))
 [BlogPost(title=My cool title)]
 
+Chinese query:
+
+>>> m = BlogPost(title=u'中文博客哦呵', content=u'这是我的第一篇博文')
+>>> session.add(m); session.commit()
+>>> list(BlogPost.search_query(u'中文'))
+[BlogPost(title=中文博客哦呵)]
+
+Query Pager:
+
+>>> list(BlogPost.search_query(u'中文', pagenum=1, pagelen=20))
+[BlogPost(title=中文博客哦呵)]
+
+Rebuild the index:
+
+>>> index_service.rebuild_index_model(BlogPost, session)
+
 Using with Flask
 ----------------
 

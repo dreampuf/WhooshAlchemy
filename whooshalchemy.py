@@ -14,17 +14,18 @@
 
 from __future__ import absolute_import
 
+import os
+
 import sqlalchemy
 from sqlalchemy import event
 from sqlalchemy.orm.session import Session
 
 import whoosh.index
 from whoosh.qparser import MultifieldParser
-from whoosh.analysis import StemmingAnalyzer
 from whoosh.fields import Schema
 
-import os
 
+from jieba.analyse import ChineseAnalyzer
 
 class IndexService(object):
 
@@ -82,7 +83,7 @@ class IndexService(object):
         primary = field.name
       if field.name in model_class.__searchable__:
         if type(field.type) in (sqlalchemy.types.Text, sqlalchemy.types.UnicodeText):
-          schema[field.name] = whoosh.fields.TEXT(analyzer=StemmingAnalyzer())
+          schema[field.name] = whoosh.fields.TEXT(stored=True, analyzer=ChineseAnalyzer())
 
     return Schema(**schema), primary
 
@@ -137,6 +138,16 @@ class IndexService(object):
 
     self.to_update = {}
 
+  def rebuild_index_model(self, model_class, session):
+    index = self.index_for_model_class(model_class)
+    with index.writer() as writer:
+      primary_field = model_class.search_query.primary
+      searchable = model_class.__searchable__
+      for i in session.query(model_class):
+        attrs = dict((key, getattr(i, key)) for key in searchable)
+        attrs[primary_field] = unicode(getattr(i, primary_field))
+        writer.delete_by_term(primary_field, unicode(getattr(i, primary_field)))
+        writer.add_document(**attrs)
 
 class Searcher(object):
   """
@@ -152,13 +163,13 @@ class Searcher(object):
     fields = set(index.schema._fields.keys()) - set([self.primary])
     self.parser = MultifieldParser(list(fields), index.schema)
 
-  def __call__(self, query, limit=None):
+  def __call__(self, query, pagenum=1, pagelen=20):
     session = self.session
     # When using Flask, get the session from the query attached to the model class.
     if not session:
       session = self.model_class.query.session
 
-    results = self.index.searcher().search(self.parser.parse(query), limit=limit)
+    results = self.index.searcher().search_page(self.parser.parse(query), pagenum, pagelen)
     keys = [x[self.primary] for x in results]
     primary_column = getattr(self.model_class, self.primary)
     return session.query(self.model_class).filter(primary_column.in_(keys))
